@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
+import { nomeSchema } from "@/lib/schemas";
 
 export default function ModalNome({ codigo }: { codigo: string }) {
   const [nome, setNome] = useState(() => {
@@ -11,13 +12,19 @@ export default function ModalNome({ codigo }: { codigo: string }) {
     }
     return "";
   });
+  const [erro, setErro] = useState<string | null>(null);
   const router = useRouter();
 
   function entrar() {
-    if (!nome.trim()) return;
-    localStorage.setItem("tela-nome", nome.trim());
+    setErro(null);
+    const result = nomeSchema.safeParse(nome);
+    if (!result.success) {
+      setErro(result.error.issues[0]?.message ?? "Nome inválido");
+      return;
+    }
+    localStorage.setItem("tela-nome", result.data);
     router.replace(
-      `/sala/${codigo}?nome=${encodeURIComponent(nome.trim())}`
+      `/sala/${codigo}?nome=${encodeURIComponent(result.data)}`
     );
   }
 
@@ -45,12 +52,25 @@ export default function ModalNome({ codigo }: { codigo: string }) {
           type="text"
           placeholder="Seu nome"
           value={nome}
-          onChange={(e) => setNome(e.target.value)}
+          onChange={(e) => { setNome(e.target.value); setErro(null); }}
           onKeyDown={(e) => e.key === "Enter" && entrar()}
           maxLength={30}
           autoFocus
           className="mt-4 w-full rounded-lg border border-border bg-input px-3 py-2 text-sm text-foreground placeholder-muted-foreground transition-shadow focus:outline-none focus:ring-1 focus:ring-ring"
         />
+
+        <AnimatePresence>
+          {erro && (
+            <motion.p
+              initial={{ opacity: 0, y: -5 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -5 }}
+              className="mt-2 text-xs text-destructive"
+            >
+              {erro}
+            </motion.p>
+          )}
+        </AnimatePresence>
 
         <motion.button
           whileHover={{ scale: 1.02 }}

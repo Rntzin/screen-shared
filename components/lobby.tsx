@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { gerarCodigo } from "@/lib/gerar-codigo";
+import { nomeSchema, codigoSchema } from "@/lib/schemas";
 
 export default function Lobby({ codigoInicial }: { codigoInicial?: string }) {
   const [nome, setNome] = useState(() => {
@@ -13,15 +14,51 @@ export default function Lobby({ codigoInicial }: { codigoInicial?: string }) {
     return "";
   });
   const [codigo, setCodigo] = useState(codigoInicial ?? "");
+  const [erro, setErro] = useState<string | null>(null);
+  const [carregando, setCarregando] = useState(false);
   const router = useRouter();
 
-  function entrar(codigoSala: string) {
-    if (!nome.trim()) return;
-    if (!codigoSala.trim()) return;
-    localStorage.setItem("tela-nome", nome.trim());
-    router.push(
-      `/sala/${codigoSala.toUpperCase()}?nome=${encodeURIComponent(nome.trim())}`,
-    );
+  async function entrar(codigoSala: string, modo: "entrar" | "criar") {
+    setErro(null);
+
+    const nomeResult = nomeSchema.safeParse(nome);
+    if (!nomeResult.success) {
+      setErro(nomeResult.error.issues[0]?.message ?? "Nome inválido");
+      return;
+    }
+
+    const codigoResult = codigoSchema.safeParse(codigoSala);
+    if (!codigoResult.success) {
+      setErro(codigoResult.error.issues[0]?.message ?? "Código inválido");
+      return;
+    }
+
+    const codigoLimpo = codigoResult.data;
+    const nomeLimpo = nomeResult.data;
+
+    setCarregando(true);
+    try {
+      const res = await fetch("/api/sala/check", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ codigo: codigoLimpo, modo }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        setErro(data.error ?? "Erro ao verificar sala");
+        return;
+      }
+
+      localStorage.setItem("tela-nome", nomeLimpo);
+      router.push(
+        `/sala/${codigoLimpo}?nome=${encodeURIComponent(nomeLimpo)}`
+      );
+    } catch {
+      setErro("Erro de conexão. Tente novamente.");
+    } finally {
+      setCarregando(false);
+    }
   }
 
   return (
@@ -61,7 +98,7 @@ export default function Lobby({ codigoInicial }: { codigoInicial?: string }) {
             type="text"
             placeholder="Seu nome"
             value={nome}
-            onChange={(e) => setNome(e.target.value)}
+            onChange={(e) => { setNome(e.target.value); setErro(null); }}
             maxLength={30}
             className="w-full rounded-lg border border-border bg-input px-3 py-2 text-sm text-foreground placeholder-muted-foreground transition-shadow focus:outline-none focus:ring-1 focus:ring-ring"
           />
@@ -70,19 +107,32 @@ export default function Lobby({ codigoInicial }: { codigoInicial?: string }) {
             type="text"
             placeholder="Código da sala"
             value={codigo}
-            onChange={(e) => setCodigo(e.target.value.toUpperCase())}
+            onChange={(e) => { setCodigo(e.target.value.toUpperCase()); setErro(null); }}
             maxLength={10}
             className="w-full rounded-lg border border-border bg-input px-3 py-2 text-sm uppercase text-foreground placeholder-muted-foreground transition-shadow focus:outline-none focus:ring-1 focus:ring-ring"
           />
 
+          <AnimatePresence>
+            {erro && (
+              <motion.p
+                initial={{ opacity: 0, y: -5 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -5 }}
+                className="text-xs text-destructive"
+              >
+                {erro}
+              </motion.p>
+            )}
+          </AnimatePresence>
+
           <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
-            onClick={() => entrar(codigo)}
-            disabled={!nome.trim() || !codigo.trim()}
+            onClick={() => entrar(codigo, "entrar")}
+            disabled={!nome.trim() || !codigo.trim() || carregando}
             className="w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            Entrar
+            {carregando ? "Verificando..." : "Entrar"}
           </motion.button>
 
           <div className="relative">
@@ -102,12 +152,12 @@ export default function Lobby({ codigoInicial }: { codigoInicial?: string }) {
             onClick={() => {
               const novo = gerarCodigo();
               setCodigo(novo);
-              entrar(novo);
+              entrar(novo, "criar");
             }}
-            disabled={!nome.trim()}
+            disabled={!nome.trim() || carregando}
             className="w-full rounded-md border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-background-tertiary disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            Criar nova sala
+            {carregando ? "Criando..." : "Criar nova sala"}
           </motion.button>
         </motion.div>
       </motion.div>

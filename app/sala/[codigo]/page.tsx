@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { validarCodigo } from "@/lib/validar-codigo";
+import { codigoSchema, nomeSchema } from "@/lib/schemas";
 import SalaDynamic from "@/components/sala-dynamic";
 import ModalNome from "@/components/modal-nome";
 
@@ -13,15 +13,17 @@ export default async function SalaPage({
   const { codigo } = await params;
   const { nome } = await searchParams;
 
-  if (!validarCodigo(codigo)) {
+  const codigoResult = codigoSchema.safeParse(codigo);
+  if (!codigoResult.success) {
     redirect("/");
   }
 
-  const codigoUpper = codigo.toUpperCase();
+  const codigoLimpo = codigoResult.data;
 
-  if (!nome?.trim()) {
-    return <ModalNome codigo={codigoUpper} />;
+  const nomeResult = nomeSchema.safeParse(nome ?? "");
+  if (!nomeResult.success) {
+    return <ModalNome codigo={codigoLimpo} />;
   }
 
-  return <SalaDynamic codigo={codigoUpper} nome={nome.trim()} />;
+  return <SalaDynamic codigo={codigoLimpo} nome={nomeResult.data} />;
 }

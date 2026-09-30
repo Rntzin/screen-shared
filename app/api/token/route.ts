@@ -1,30 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { criarToken } from "@/lib/livekit";
-import { validarCodigo } from "@/lib/validar-codigo";
+import { tokenRequestSchema } from "@/lib/schemas";
 
 export async function POST(req: NextRequest) {
-  const { room, username } = await req.json();
+  const body = await req.json();
+  const parsed = tokenRequestSchema.safeParse(body);
 
-  if (!room || !username) {
-    return NextResponse.json(
-      { error: "Nome e código da sala são obrigatórios" },
-      { status: 400 }
-    );
+  if (!parsed.success) {
+    const msg = parsed.error.issues[0]?.message ?? "Dados inválidos";
+    return NextResponse.json({ error: msg }, { status: 400 });
   }
 
-  if (!validarCodigo(room)) {
-    return NextResponse.json(
-      { error: "Código da sala inválido" },
-      { status: 400 }
-    );
-  }
-
-  const name = String(username).trim().slice(0, 30);
-  if (!name) {
-    return NextResponse.json({ error: "Nome inválido" }, { status: 400 });
-  }
-
-  const token = await criarToken(room.toUpperCase(), name);
+  const { room, username } = parsed.data;
+  const token = await criarToken(room, username);
 
   return NextResponse.json({ token, url: process.env.LIVEKIT_URL });
 }
