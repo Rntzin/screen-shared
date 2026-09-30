@@ -44,45 +44,67 @@ body {
 }
 
 /* Barra de controles customizada */
+.lk-control-bar-custom {
+  background: linear-gradient(to top, var(--background-secondary), hsl(180, 28%, 10%));
+}
+
 .lk-control-bar-custom button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  height: 2.25rem;
-  padding: 0 0.75rem;
-  border-radius: 0.5rem;
-  font-size: 0.875rem;
+  height: 2.5rem;
+  padding: 0 1rem;
+  border-radius: 0.75rem;
+  font-size: 0.8125rem;
   font-weight: 500;
   color: var(--foreground);
-  background: var(--background-tertiary);
-  border: none;
+  background: hsl(180, 25%, 14%);
+  border: 1px solid hsl(180, 20%, 18%);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.2s ease;
 }
 
 .lk-control-bar-custom button:hover {
-  background: var(--muted);
+  background: hsl(180, 22%, 18%);
+  border-color: hsl(180, 20%, 22%);
+  transform: translateY(-1px);
+}
+
+.lk-control-bar-custom button:active {
+  transform: translateY(0);
 }
 
 .lk-control-bar-custom button[data-lk-muted="true"] {
-  background: hsl(0, 100%, 61%, 0.15);
-  color: var(--destructive);
+  background: hsl(0, 70%, 20%);
+  border-color: hsl(0, 60%, 30%);
+  color: hsl(0, 100%, 75%);
+}
+
+.lk-control-bar-custom button[data-lk-muted="true"]:hover {
+  background: hsl(0, 70%, 25%);
 }
 
 .lk-control-bar-custom button[data-lk-enabled="true"] {
-  background: hsl(86, 100%, 60%, 0.15);
+  background: hsl(86, 50%, 15%);
+  border-color: hsl(86, 60%, 25%);
   color: var(--primary);
 }
 
+.lk-control-bar-custom button[data-lk-enabled="true"]:hover {
+  background: hsl(86, 50%, 20%);
+}
+
 .lk-control-bar-custom button.lk-disconnect-button {
-  background: hsl(0, 100%, 61%, 0.15);
-  color: var(--destructive);
-  padding: 0 1rem;
+  background: hsl(0, 70%, 45%);
+  border-color: hsl(0, 70%, 50%);
+  color: white;
+  padding: 0 1.25rem;
 }
 
 .lk-control-bar-custom button.lk-disconnect-button:hover {
-  background: hsl(0, 100%, 61%, 0.25);
+  background: hsl(0, 70%, 50%);
+  border-color: hsl(0, 70%, 55%);
 }
 
 /* Slider de volume */

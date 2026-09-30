@@ -1,19 +1,19 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { motion } from "framer-motion";
 import { gerarCodigo } from "@/lib/gerar-codigo";
 
 export default function Lobby({ codigoInicial }: { codigoInicial?: string }) {
-  const [nome, setNome] = useState("");
+  const [nome, setNome] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("tela-nome") ?? "";
+    }
+    return "";
+  });
   const [codigo, setCodigo] = useState(codigoInicial ?? "");
   const router = useRouter();
-
-  // Recupera nome salvo
-  useEffect(() => {
-    const saved = localStorage.getItem("tela-nome");
-    if (saved) setNome(saved);
-  }, []);
 
   function entrar(codigoSala: string) {
     if (!nome.trim()) return;
@@ -26,15 +26,37 @@ export default function Lobby({ codigoInicial }: { codigoInicial?: string }) {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
-      <div className="w-full max-w-sm rounded-xl border border-border bg-background-secondary">
+      <motion.div
+        initial={{ opacity: 0, y: 20, scale: 0.97 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.4, ease: "easeOut" }}
+        className="w-full max-w-sm rounded-xl border border-border bg-background-secondary"
+      >
         <div className="rounded-t-xl bg-linear-to-b from-primary/10 to-transparent px-6 pt-6 pb-4 text-center">
-          <h1 className="text-2xl font-semibold text-foreground">Tela</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <motion.h1
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.15, duration: 0.3 }}
+            className="text-2xl font-semibold text-foreground"
+          >
+            Tela
+          </motion.h1>
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.25, duration: 0.3 }}
+            className="mt-1 text-sm text-muted-foreground"
+          >
             Compartilhe sua tela com amigos
-          </p>
+          </motion.p>
         </div>
 
-        <div className="space-y-4 px-6 pb-6">
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.3, duration: 0.3 }}
+          className="space-y-4 px-6 pb-6"
+        >
           <input
             type="text"
             placeholder="Seu nome"
@@ -53,13 +75,15 @@ export default function Lobby({ codigoInicial }: { codigoInicial?: string }) {
             className="w-full rounded-lg border border-border bg-input px-3 py-2 text-sm uppercase text-foreground placeholder-muted-foreground transition-shadow focus:outline-none focus:ring-1 focus:ring-ring"
           />
 
-          <button
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
             onClick={() => entrar(codigo)}
             disabled={!nome.trim() || !codigo.trim()}
             className="w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
           >
             Entrar
-          </button>
+          </motion.button>
 
           <div className="relative">
             <div className="absolute inset-0 flex items-center">
@@ -72,7 +96,9 @@ export default function Lobby({ codigoInicial }: { codigoInicial?: string }) {
             </div>
           </div>
 
-          <button
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
             onClick={() => {
               const novo = gerarCodigo();
               setCodigo(novo);
@@ -82,9 +108,9 @@ export default function Lobby({ codigoInicial }: { codigoInicial?: string }) {
             className="w-full rounded-md border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-background-tertiary disabled:opacity-40 disabled:cursor-not-allowed"
           >
             Criar nova sala
-          </button>
-        </div>
-      </div>
+          </motion.button>
+        </motion.div>
+      </motion.div>
     </div>
   );
 }

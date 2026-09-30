@@ -40,7 +40,7 @@ import SalaLoading from "./sala-loading";
 
 type AudioSettings = { muted: boolean; volume: number };
 
-function SortableTile({ trackId, trackRef }: { trackId: string; trackRef: any }) {
+function SortableTile({ trackId, trackRef }: { trackId: string; trackRef: Parameters<typeof ParticipantTile>[0]["trackRef"] }) {
   const {
     attributes,
     listeners,
@@ -72,6 +72,7 @@ function SortableTile({ trackId, trackRef }: { trackId: string; trackRef: any })
 function SalaLayout({ codigo }: { codigo: string }) {
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   const [focusedIds, setFocusedIds] = useState<string[]>([]);
+  const [hiddenFromFocus, setHiddenFromFocus] = useState<Set<string>>(new Set());
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [audioMap, setAudioMap] = useState<Record<string, AudioSettings>>({});
   const [linkCopiado, setLinkCopiado] = useState(false);
@@ -93,7 +94,11 @@ function SalaLayout({ codigo }: { codigo: string }) {
   const toggleHide = useCallback((identity: string) => {
     setHidden((prev) => {
       const next = new Set(prev);
-      next.has(identity) ? next.delete(identity) : next.add(identity);
+      if (next.has(identity)) {
+        next.delete(identity);
+      } else {
+        next.add(identity);
+      }
       return next;
     });
   }, []);
@@ -145,21 +150,37 @@ function SalaLayout({ codigo }: { codigo: string }) {
     activeTracks.map((t) => t.participant.identity)
   );
 
-  // Auto-adiciona novos tracks ao foco
-  useEffect(() => {
-    const visibleIds = new Set(visibleTracks.map((t) => getTrackReferenceId(t)));
-    setFocusedIds((prev) => {
-      // Remove IDs que não existem mais
-      const cleaned = prev.filter((id) => visibleIds.has(id));
-      // Adiciona novos IDs que ainda não estão no array
-      const newIds = [...visibleIds].filter((id) => !cleaned.includes(id));
-      if (newIds.length === 0 && cleaned.length === prev.length) return prev;
-      return [...cleaned, ...newIds];
-    });
-  }, [visibleTracks]);
+  // Sincroniza focusedIds: remove tracks que sumiram, adiciona novos (se não escondidos pelo user)
+  const visibleIdsSet = new Set(visibleTracks.map((t) => getTrackReferenceId(t)));
+  const needsSync =
+    focusedIds.some((id) => !visibleIdsSet.has(id)) ||
+    [...visibleIdsSet].some((id) => !focusedIds.includes(id) && !hiddenFromFocus.has(id));
+
+  if (needsSync) {
+    const validIds = focusedIds.filter((id) => visibleIdsSet.has(id));
+    const newIds = [...visibleIdsSet].filter(
+      (id) => !validIds.includes(id) && !hiddenFromFocus.has(id)
+    );
+    queueMicrotask(() => setFocusedIds([...validIds, ...newIds]));
+  }
+
+  // Limpa hiddenFromFocus de tracks que não existem mais
+  const staleHidden = [...hiddenFromFocus].some((id) => !visibleIdsSet.has(id));
+  if (staleHidden) {
+    queueMicrotask(() =>
+      setHiddenFromFocus((prev) => {
+        const next = new Set(prev);
+        for (const id of next) {
+          if (!visibleIdsSet.has(id)) next.delete(id);
+        }
+        return next;
+      })
+    );
+  }
 
   // Tracks focados na ordem do drag
   const focusedTracks = focusedIds
+    .filter((id) => visibleIdsSet.has(id))
     .map((id) => visibleTracks.find((t) => getTrackReferenceId(t) === id))
     .filter(Boolean);
 
@@ -178,15 +199,22 @@ function SalaLayout({ codigo }: { codigo: string }) {
     });
   }
 
-  // Toggle individual no carrossel
+  // Toggle individual no carrossel — esconde/mostra do grid principal
   function toggleFocus(trackId: string) {
-    setFocusedIds((prev) => {
-      if (prev.includes(trackId)) {
-        if (prev.length <= 1) return prev; // mínimo 1
-        return prev.filter((id) => id !== trackId);
-      }
-      return [...prev, trackId];
-    });
+    const isFocused = focusedIds.includes(trackId);
+    if (isFocused) {
+      // Esconder: remove do foco e marca como escondido pelo user
+      setFocusedIds((prev) => prev.filter((id) => id !== trackId));
+      setHiddenFromFocus((prev) => new Set(prev).add(trackId));
+    } else {
+      // Mostrar: adiciona ao foco e remove do escondido
+      setFocusedIds((prev) => [...prev, trackId]);
+      setHiddenFromFocus((prev) => {
+        const next = new Set(prev);
+        next.delete(trackId);
+        return next;
+      });
+    }
   }
 
   // Grid columns baseado na quantidade
@@ -390,10 +418,9 @@ function SalaLayout({ codigo }: { codigo: string }) {
               const trackId = getTrackReferenceId(trackRef);
               const isFocused = focusedIds.includes(trackId);
               return (
-                <button
+                <div
                   key={trackId}
-                  onClick={() => toggleFocus(trackId)}
-                  className={`relative h-full shrink-0 aspect-video overflow-hidden rounded-lg border-2 transition-all ${
+                  className={`group relative h-full shrink-0 aspect-video overflow-hidden rounded-lg border-2 transition-all ${
                     isFocused
                       ? "border-primary ring-1 ring-primary/50"
                       : "border-transparent opacity-50 hover:opacity-80 hover:border-muted-foreground/30"
@@ -412,7 +439,29 @@ function SalaLayout({ codigo }: { codigo: string }) {
                       {trackRef.source === Track.Source.ScreenShare ? " (tela)" : ""}
                     </span>
                   </div>
-                </button>
+                  {/* Botão olho — mostrar/esconder do foco */}
+                  <button
+                    onClick={() => toggleFocus(trackId)}
+                    className={`absolute top-1 right-1 z-10 flex h-6 w-6 items-center justify-center rounded-md transition-all ${
+                      isFocused
+                        ? "bg-primary/20 text-primary opacity-0 group-hover:opacity-100"
+                        : "bg-destructive/20 text-destructive opacity-80"
+                    }`}
+                    title={isFocused ? "Esconder" : "Mostrar"}
+                  >
+                    {isFocused ? (
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                        <circle cx="12" cy="12" r="3"/>
+                      </svg>
+                    ) : (
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+                        <line x1="1" y1="1" x2="23" y2="23"/>
+                      </svg>
+                    )}
+                  </button>
+                </div>
               );
             })}
           </div>
