@@ -107,6 +107,16 @@ body {
   border-color: hsl(0, 70%, 55%);
 }
 
+.lk-control-bar-custom button.all-muted-active {
+  background: hsl(0, 70%, 20%);
+  border-color: hsl(0, 60%, 30%);
+  color: hsl(0, 100%, 75%);
+}
+
+.lk-control-bar-custom button.all-muted-active:hover {
+  background: hsl(0, 70%, 25%);
+}
+
 /* Slider de volume */
 .audio-slider::-webkit-slider-thumb {
   -webkit-appearance: none;

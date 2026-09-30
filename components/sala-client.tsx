@@ -76,6 +76,8 @@ function SalaLayout({ codigo }: { codigo: string }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [audioMap, setAudioMap] = useState<Record<string, AudioSettings>>({});
   const [linkCopiado, setLinkCopiado] = useState(false);
+  const [allMuted, setAllMuted] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const room = useRoomContext();
 
   useEffect(() => {
@@ -83,6 +85,24 @@ function SalaLayout({ codigo }: { codigo: string }) {
     window.addEventListener("beforeunload", handleUnload);
     return () => window.removeEventListener("beforeunload", handleUnload);
   }, [room]);
+
+  useEffect(() => {
+    const handleFs = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", handleFs);
+    return () => document.removeEventListener("fullscreenchange", handleFs);
+  }, []);
+
+  const toggleFullscreen = useCallback(() => {
+    if (document.fullscreenElement) {
+      document.exitFullscreen();
+    } else {
+      document.documentElement.requestFullscreen();
+    }
+  }, []);
+
+  const toggleAllMuted = useCallback(() => {
+    setAllMuted((prev) => !prev);
+  }, []);
 
   const [popover, setPopover] = useState<{
     identity: string;
@@ -480,6 +500,50 @@ function SalaLayout({ codigo }: { codigo: string }) {
           <TrackToggle source={Track.Source.ScreenShare} showIcon={true}>
             Compartilhar
           </TrackToggle>
+
+          {/* Mutar todos */}
+          <button
+            onClick={toggleAllMuted}
+            className={allMuted ? "all-muted-active" : ""}
+            title={allMuted ? "Ativar áudio de todos" : "Silenciar todos"}
+          >
+            {allMuted ? (
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 3l18 18"/>
+                <path d="M3 14h3a2 2 0 0 1 2 2v1a2 2 0 0 0 2 2h0a2 2 0 0 0 2-2v-7.5"/>
+                <path d="M21 14h-1.5"/>
+                <path d="M15 14h-2"/>
+                <path d="M9 7V6a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v8"/>
+              </svg>
+            ) : (
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 14h3a2 2 0 0 1 2 2v1a2 2 0 0 0 2 2h0a2 2 0 0 0 2-2V6a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v8a2 2 0 0 0 2 2h3"/>
+              </svg>
+            )}
+          </button>
+
+          {/* Tela cheia */}
+          <button
+            onClick={toggleFullscreen}
+            title={isFullscreen ? "Sair da tela cheia" : "Tela cheia"}
+          >
+            {isFullscreen ? (
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="4 14 10 14 10 20"/>
+                <polyline points="20 10 14 10 14 4"/>
+                <line x1="14" y1="10" x2="21" y2="3"/>
+                <line x1="3" y1="21" x2="10" y2="14"/>
+              </svg>
+            ) : (
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="15 3 21 3 21 9"/>
+                <polyline points="9 21 3 21 3 15"/>
+                <line x1="21" y1="3" x2="14" y2="10"/>
+                <line x1="3" y1="21" x2="10" y2="14"/>
+              </svg>
+            )}
+          </button>
+
           <DisconnectButton>Sair</DisconnectButton>
         </div>
       </div>
@@ -494,7 +558,7 @@ function SalaLayout({ codigo }: { codigo: string }) {
             <AudioTrack
               key={getTrackReferenceId(ref)}
               trackRef={ref}
-              volume={audio.muted ? 0 : audio.volume}
+              volume={allMuted || audio.muted ? 0 : audio.volume}
             />
           );
         })}
@@ -558,6 +622,11 @@ export default function SalaClient({
         serverUrl={url}
         connect={true}
         options={{
+          audioCaptureDefaults: {
+            noiseSuppression: true,
+            echoCancellation: true,
+            autoGainControl: true,
+          },
           publishDefaults: {
             screenShareEncoding: {
               maxBitrate: 3_500_000,
