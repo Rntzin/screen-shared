@@ -35,12 +35,13 @@ import {
   arrayMove,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { Headphones, HeadphoneOff, Minimize2, Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
 import SalaLoading from "./sala-loading";
 
 type AudioSettings = { muted: boolean; volume: number };
 
-function SortableTile({ trackId, trackRef }: { trackId: string; trackRef: Parameters<typeof ParticipantTile>[0]["trackRef"] }) {
+function SortableTile({ trackId, trackRef, onDoubleClick }: { trackId: string; trackRef: Parameters<typeof ParticipantTile>[0]["trackRef"]; onDoubleClick?: () => void }) {
   const {
     attributes,
     listeners,
@@ -63,6 +64,7 @@ function SortableTile({ trackId, trackRef }: { trackId: string; trackRef: Parame
       {...attributes}
       {...listeners}
       className="relative min-h-0 min-w-0 cursor-grab active:cursor-grabbing"
+      onDoubleClick={onDoubleClick}
     >
       <ParticipantTile trackRef={trackRef} className="h-full w-full rounded-lg" />
     </div>
@@ -77,7 +79,7 @@ function SalaLayout({ codigo }: { codigo: string }) {
   const [audioMap, setAudioMap] = useState<Record<string, AudioSettings>>({});
   const [linkCopiado, setLinkCopiado] = useState(false);
   const [allMuted, setAllMuted] = useState(false);
-  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [soloTrackId, setSoloTrackId] = useState<string | null>(null);
   const room = useRoomContext();
 
   useEffect(() => {
@@ -86,19 +88,16 @@ function SalaLayout({ codigo }: { codigo: string }) {
     return () => window.removeEventListener("beforeunload", handleUnload);
   }, [room]);
 
+  // ESC sai do modo solo
   useEffect(() => {
-    const handleFs = () => setIsFullscreen(!!document.fullscreenElement);
-    document.addEventListener("fullscreenchange", handleFs);
-    return () => document.removeEventListener("fullscreenchange", handleFs);
-  }, []);
-
-  const toggleFullscreen = useCallback(() => {
-    if (document.fullscreenElement) {
-      document.exitFullscreen();
-    } else {
-      document.documentElement.requestFullscreen();
-    }
-  }, []);
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && soloTrackId) {
+        setSoloTrackId(null);
+      }
+    };
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [soloTrackId]);
 
   const toggleAllMuted = useCallback(() => {
     setAllMuted((prev) => !prev);
@@ -184,6 +183,11 @@ function SalaLayout({ codigo }: { codigo: string }) {
     queueMicrotask(() => setFocusedIds([...validIds, ...newIds]));
   }
 
+  // Limpa soloTrackId se o track sumiu
+  if (soloTrackId && !visibleIdsSet.has(soloTrackId)) {
+    queueMicrotask(() => setSoloTrackId(null));
+  }
+
   // Limpa hiddenFromFocus de tracks que não existem mais
   const staleHidden = [...hiddenFromFocus].some((id) => !visibleIdsSet.has(id));
   if (staleHidden) {
@@ -197,6 +201,11 @@ function SalaLayout({ codigo }: { codigo: string }) {
       })
     );
   }
+
+  // Track em modo solo
+  const soloTrack = soloTrackId
+    ? visibleTracks.find((t) => getTrackReferenceId(t) === soloTrackId) ?? null
+    : null;
 
   // Tracks focados na ordem do drag
   const focusedTracks = focusedIds
@@ -399,9 +408,22 @@ function SalaLayout({ codigo }: { codigo: string }) {
 
       {/* Área principal */}
       <div className="flex flex-1 flex-col overflow-hidden">
-        {/* Grid de foco — drag and drop */}
+        {/* Área de vídeo */}
         <div data-lk-theme="default" className="flex-1 overflow-hidden p-2">
-          {focusedTracks.length > 0 ? (
+          {soloTrack ? (
+            /* Modo solo — uma tela cheia */
+            <div className="relative h-full">
+              <ParticipantTile trackRef={soloTrack} className="h-full w-full rounded-lg" />
+              <button
+                onClick={() => setSoloTrackId(null)}
+                className="absolute top-3 right-3 z-10 flex h-8 w-8 items-center justify-center rounded-lg bg-background/80 text-foreground backdrop-blur-sm transition-colors hover:bg-background"
+                title="Voltar ao grid"
+              >
+                <Minimize2 size={16} />
+              </button>
+            </div>
+          ) : focusedTracks.length > 0 ? (
+            /* Grid normal — drag and drop */
             <DndContext
               sensors={sensors}
               collisionDetection={closestCenter}
@@ -416,6 +438,7 @@ function SalaLayout({ codigo }: { codigo: string }) {
                         key={trackId}
                         trackId={trackId}
                         trackRef={trackRef}
+                        onDoubleClick={() => setSoloTrackId(trackId)}
                       />
                     );
                   })}
@@ -436,11 +459,18 @@ function SalaLayout({ codigo }: { codigo: string }) {
           <div className="flex h-24 shrink-0 items-center gap-2 overflow-x-auto border-t border-border bg-background-secondary px-3 py-2 md:h-28">
             {visibleTracks.map((trackRef) => {
               const trackId = getTrackReferenceId(trackRef);
-              const isFocused = focusedIds.includes(trackId);
+              const isFocused = soloTrackId
+                ? soloTrackId === trackId
+                : focusedIds.includes(trackId);
               return (
                 <div
                   key={trackId}
+                  onClick={() => {
+                    if (soloTrackId) setSoloTrackId(trackId);
+                  }}
                   className={`group relative h-full shrink-0 aspect-video overflow-hidden rounded-lg border-2 transition-all ${
+                    soloTrackId ? "cursor-pointer" : ""
+                  } ${
                     isFocused
                       ? "border-primary ring-1 ring-primary/50"
                       : "border-transparent opacity-50 hover:opacity-80 hover:border-muted-foreground/30"
@@ -459,9 +489,15 @@ function SalaLayout({ codigo }: { codigo: string }) {
                       {trackRef.source === Track.Source.ScreenShare ? " (tela)" : ""}
                     </span>
                   </div>
-                  {/* Botão olho — mostrar/esconder do foco */}
+                  {/* Botão olho — mostrar/esconder do foco (ou trocar solo) */}
                   <button
-                    onClick={() => toggleFocus(trackId)}
+                    onClick={() => {
+                      if (soloTrackId) {
+                        setSoloTrackId(trackId);
+                      } else {
+                        toggleFocus(trackId);
+                      }
+                    }}
                     className={`absolute top-1 right-1 z-10 flex h-6 w-6 items-center justify-center rounded-md transition-all ${
                       isFocused
                         ? "bg-primary/20 text-primary opacity-0 group-hover:opacity-100"
@@ -469,17 +505,7 @@ function SalaLayout({ codigo }: { codigo: string }) {
                     }`}
                     title={isFocused ? "Esconder" : "Mostrar"}
                   >
-                    {isFocused ? (
-                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                        <circle cx="12" cy="12" r="3"/>
-                      </svg>
-                    ) : (
-                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
-                        <line x1="1" y1="1" x2="23" y2="23"/>
-                      </svg>
-                    )}
+                    {isFocused ? <Eye size={14} /> : <EyeOff size={14} />}
                   </button>
                 </div>
               );
@@ -507,41 +533,7 @@ function SalaLayout({ codigo }: { codigo: string }) {
             className={allMuted ? "all-muted-active" : ""}
             title={allMuted ? "Ativar áudio de todos" : "Silenciar todos"}
           >
-            {allMuted ? (
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M3 3l18 18"/>
-                <path d="M3 14h3a2 2 0 0 1 2 2v1a2 2 0 0 0 2 2h0a2 2 0 0 0 2-2v-7.5"/>
-                <path d="M21 14h-1.5"/>
-                <path d="M15 14h-2"/>
-                <path d="M9 7V6a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v8"/>
-              </svg>
-            ) : (
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M3 14h3a2 2 0 0 1 2 2v1a2 2 0 0 0 2 2h0a2 2 0 0 0 2-2V6a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v8a2 2 0 0 0 2 2h3"/>
-              </svg>
-            )}
-          </button>
-
-          {/* Tela cheia */}
-          <button
-            onClick={toggleFullscreen}
-            title={isFullscreen ? "Sair da tela cheia" : "Tela cheia"}
-          >
-            {isFullscreen ? (
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="4 14 10 14 10 20"/>
-                <polyline points="20 10 14 10 14 4"/>
-                <line x1="14" y1="10" x2="21" y2="3"/>
-                <line x1="3" y1="21" x2="10" y2="14"/>
-              </svg>
-            ) : (
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="15 3 21 3 21 9"/>
-                <polyline points="9 21 3 21 3 15"/>
-                <line x1="21" y1="3" x2="14" y2="10"/>
-                <line x1="3" y1="21" x2="10" y2="14"/>
-              </svg>
-            )}
+            {allMuted ? <HeadphoneOff size={16} /> : <Headphones size={16} />}
           </button>
 
           <DisconnectButton>Sair</DisconnectButton>
