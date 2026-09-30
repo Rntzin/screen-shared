@@ -1,26 +1,122 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: hsl(180, 35%, 7%);
+  --background-secondary: hsl(180, 30%, 12%);
+  --background-tertiary: hsl(180, 26%, 16%);
+  --foreground: hsl(0, 0%, 98%);
+  --primary: hsl(86, 100%, 60%);
+  --primary-foreground: hsl(180, 35%, 7%);
+  --secondary: hsl(180, 35%, 10%);
+  --muted: hsl(180, 20%, 25%);
+  --muted-foreground: hsl(180, 10%, 55%);
+  --border: hsl(180, 25%, 15%);
+  --input: hsl(180, 26%, 16%);
+  --destructive: hsl(0, 100%, 61%);
+  --ring: hsl(86, 100%, 60%);
 }
 
 @theme inline {
   --color-background: var(--background);
+  --color-background-secondary: var(--background-secondary);
+  --color-background-tertiary: var(--background-tertiary);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-destructive: var(--destructive);
+  --color-ring: var(--ring);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  margin: 0;
 }
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(180, 20%, 25%) transparent;
+}
+
+/* Barra de controles customizada */
+.lk-control-bar-custom button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  height: 2.25rem;
+  padding: 0 0.75rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--foreground);
+  background: var(--background-tertiary);
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.lk-control-bar-custom button:hover {
+  background: var(--muted);
+}
+
+.lk-control-bar-custom button[data-lk-muted="true"] {
+  background: hsl(0, 100%, 61%, 0.15);
+  color: var(--destructive);
+}
+
+.lk-control-bar-custom button[data-lk-enabled="true"] {
+  background: hsl(86, 100%, 60%, 0.15);
+  color: var(--primary);
+}
+
+.lk-control-bar-custom button.lk-disconnect-button {
+  background: hsl(0, 100%, 61%, 0.15);
+  color: var(--destructive);
+  padding: 0 1rem;
+}
+
+.lk-control-bar-custom button.lk-disconnect-button:hover {
+  background: hsl(0, 100%, 61%, 0.25);
+}
+
+/* Slider de volume */
+.audio-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--primary);
+  cursor: pointer;
+}
+
+.audio-slider::-moz-range-thumb {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--primary);
+  border: none;
+  cursor: pointer;
+}
+
+/* Traduzir textos do LiveKit para PT-BR */
+[data-lk-theme] .lk-participant-name::after {
+  content: none;
+}
+
+/* Esconder "screen" e substituir por overlay customizado */
+[data-lk-theme] .lk-focus-toggle-button {
+  display: none;
+}
+
+/* Tooltip overrides */
+[data-lk-theme] button[aria-label="Mute Microphone"]::before { content: "Silenciar microfone"; }
+[data-lk-theme] button[aria-label="Unmute Microphone"]::before { content: "Ativar microfone"; }
+[data-lk-theme] button[aria-label="Mute Camera"]::before { content: "Desligar câmera"; }
+[data-lk-theme] button[aria-label="Unmute Camera"]::before { content: "Ligar câmera"; }
